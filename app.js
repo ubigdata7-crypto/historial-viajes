@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY5YzkxMWZhNzA4NTRmMjM5ZTIyNGJhMDU2MmJlMWM4IiwiaCI6Im11cm11cjY0In0='; 
     let currentLanguage = localStorage.getItem('language') || 'es';
 
-    // Diccionario completo de traducciones
+    // Diccionario de traducciones
     const translations = {
         es: {
             title: "Mi Historial de Viajes",
@@ -169,11 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Ajuste para el correcto dimensionamiento del mapa en dispositivos móviles
     setTimeout(() => { map.invalidateSize(); }, 200);
     window.addEventListener('resize', () => { map.invalidateSize(); });
 
-    // --- FUNCIONES DE GEOCODIFICACIÓN (Usando OpenRouteService) ---
+    // --- GEOCODIFICACIÓN ---
     const getCoordinates = async (city) => {
         try {
             const response = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${ORS_API_KEY}&text=${encodeURIComponent(city)}&size=1`);
@@ -234,14 +233,28 @@ document.addEventListener('DOMContentLoaded', () => {
                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = R * c;
-
-        return distance.toFixed(2);
+        return (R * c).toFixed(2);
     };
 
-    const getDrivingDistanceAndPath = async (coords1, coords2) => {
+    // CORRECCIÓN: Uso de método POST para evitar errores 404 en OpenRouteService
+    const getdrivingDistanceAndPath = async (coords1, coords2) => {
         try {
-            const response = await fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${coords1[1]},${coords1[0]}&end=${coords2[1]},${coords2[0]}`);
+            const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+                method: 'POST',
+                headers: {
+                    'Authorization': ORS_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    coordinates: [
+                        [coords1[1], coords1[0]], // [lon, lat]
+                        [coords2[1], coords2[0]]
+                    ]
+                })
+            });
+            
+            if (!response.ok) throw new Error('Error en la API de rutas');
+
             const data = await response.json();
 
             if (data.features && data.features.length > 0) {
@@ -252,12 +265,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return { km: 'No disponible', ruta: null };
         } catch (error) {
-            console.error('Error al obtener la ruta de conducción:', error);
+            console.error('Error al obtener la ruta en auto:', error);
             return { km: 'No disponible', ruta: null };
         }
     };
 
-    // --- Funciones de la UI ---
+    // --- UI Y MAPA ---
     const drawTravelsOnMap = async () => {
         map.eachLayer((layer) => {
             if (layer instanceof L.Polyline || layer instanceof L.Marker) {
@@ -344,12 +357,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (origenCoords && destinoCoords) {
             if (transporte === 'auto') {
-                const result = await getDrivingDistanceAndPath(origenCoords, destinoCoords);
+                const result = await getdrivingDistanceAndPath(origenCoords, destinoCoords);
                 if (result.km !== 'No disponible') {
                     km = result.km;
                     ruta = result.ruta;
                 } else {
-                    // Respaldo por distancia directa si falla la ruta en auto de la API
+                    // Respaldo automático de distancia si la API de conducción falla puntualmente
                     km = calculateDistance(origenCoords, destinoCoords);
                     ruta = [origenCoords, destinoCoords];
                 }
@@ -446,14 +459,12 @@ document.addEventListener('DOMContentLoaded', () => {
         setLanguage(currentLanguage);
     });
 
-    // Registrar Service Worker para soporte PWA (opcional)
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         });
     }
 
-    // Cargar la aplicación
     languageSelector.value = currentLanguage;
     setLanguage(currentLanguage);
 });
