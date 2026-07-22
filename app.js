@@ -180,7 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.features && data.features.length > 0) {
                 const coords = data.features[0].geometry.coordinates;
-                // ORS devuelve [Longitud, Latitud], Leaflet usa [Latitud, Longitud]
                 return [coords[1], coords[0]]; 
             }
             return null;
@@ -190,7 +189,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Función de sugerencias mejorada para actualizar el input correcto sin conflictos
     const getSuggestions = async (query, suggestionsContainer, targetInput) => {
         if (query.length < 3) {
             suggestionsContainer.innerHTML = '';
@@ -207,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const li = document.createElement('li');
                     li.textContent = feature.properties.label; 
                     
-                    // Evento mousedown para asegurar que el click se registre antes de perder el foco
                     li.addEventListener('mousedown', (e) => {
                         e.preventDefault(); 
                         targetInput.value = feature.properties.label; 
@@ -348,8 +345,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (origenCoords && destinoCoords) {
             if (transporte === 'auto') {
                 const result = await getDrivingDistanceAndPath(origenCoords, destinoCoords);
-                km = result.km;
-                ruta = result.ruta;
+                if (result.km !== 'No disponible') {
+                    km = result.km;
+                    ruta = result.ruta;
+                } else {
+                    // Respaldo por distancia directa si falla la ruta en auto de la API
+                    km = calculateDistance(origenCoords, destinoCoords);
+                    ruta = [origenCoords, destinoCoords];
+                }
             } else {
                 km = calculateDistance(origenCoords, destinoCoords);
             }
@@ -416,7 +419,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 800);
     });
 
-    // Cerrar sugerencias al hacer clic fuera
     document.addEventListener('mousedown', (e) => {
         if (!origenInput.contains(e.target) && !suggestionsOrigen.contains(e.target)) {
             suggestionsOrigen.innerHTML = '';
@@ -443,6 +445,13 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('language', currentLanguage);
         setLanguage(currentLanguage);
     });
+
+    // Registrar Service Worker para soporte PWA (opcional)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+    }
 
     // Cargar la aplicación
     languageSelector.value = currentLanguage;
