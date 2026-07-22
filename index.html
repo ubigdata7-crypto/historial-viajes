@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Historial de Viajes</title>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Leaflet CSS y JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="language-selector-container">
+        <label for="language-selector"></label>
+        <select id="language-selector">
+            <option value="es">Español</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="pt">Português</option>
+        </select>
+    </div>
+
+    <main class="container">
+        <h1 id="app-title"></h1>
+        <p id="app-description"></p>
+
+        <section class="card">
+            <h2 id="form-title"></h2>
+            <form id="travel-form">
+                <div class="form-group">
+                    <label id="label-fecha" for="fecha"></label>
+                    <input type="date" id="fecha" required>
+                </div>
+                <div class="form-group">
+                    <label id="label-origen" for="origen"></label>
+                    <input type="text" id="origen" required autocomplete="off">
+                    <div id="suggestions-origen" class="suggestions-list"></div>
+                </div>
+                <div class="form-group">
+                    <label id="label-destino" for="destino"></label>
+                    <input type="text" id="destino" required autocomplete="off">
+                    <div id="suggestions-destino" class="suggestions-list"></div>
+                </div>
+                <div class="form-group">
+                    <label id="label-transporte" for="transporte"></label>
+                    <select id="transporte" required>
+                        <option value="auto"></option>
+                        <option value="avion"></option>
+                    </select>
+                </div>
+                <button type="submit" id="save-button" class="btn btn-primary"></button>
+            </form>
+        </section>
+        
+        <section class="card">
+            <h2 id="map-title"></h2>
+            <div id="map"></div>
+        </section>
+
+        <section class="card">
+            <h2 id="history-title"></h2>
+            <div id="total-km"></div>
+            <!-- Contenedor responsivo para la tabla -->
+            <div class="table-responsive">
+                <table id="travel-table">
+                    <thead>
+                        <tr>
+                            <th id="header-fecha"></th>
+                            <th id="header-origen"></th>
+                            <th id="header-destino"></th>
+                            <th id="header-transporte"></th>
+                            <th id="header-km"></th>
+                            <th id="header-acciones"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
