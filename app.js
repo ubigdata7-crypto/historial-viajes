@@ -9,11 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const suggestionsOrigen = document.getElementById('suggestions-origen');
     const suggestionsDestino = document.getElementById('suggestions-destino');
     
-    // API de OpenRouteService
     const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY5YzkxMWZhNzA4NTRmMjM5ZTIyNGJhMDU2MmJlMWM4IiwiaCI6Im11cm11cjY0In0='; 
     let currentLanguage = localStorage.getItem('language') || 'es';
 
-    // Diccionario de traducciones
     const translations = {
         es: {
             title: "Mi Historial de Viajes",
@@ -163,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let travels = JSON.parse(localStorage.getItem('travels')) || [];
     
-    // Inicialización del mapa
     const map = L.map('map').setView([0, 0], 2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -172,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { map.invalidateSize(); }, 200);
     window.addEventListener('resize', () => { map.invalidateSize(); });
 
-    // --- GEOCODIFICACIÓN ---
     const getCoordinates = async (city) => {
         try {
             const response = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${ORS_API_KEY}&text=${encodeURIComponent(city)}&size=1`);
@@ -220,7 +216,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const calculateDistance = (coords1, coords2) => {
+    // Cálculo optimizado: Distancia de carretera adapta un factor terrestre de asfalto (1.2x) para autos
+    const calculateDistance = (coords1, coords2, isCar = false) => {
         const R = 6371;
         const [lat1, lon1] = coords1;
         const [lat2, lon2] = coords2;
@@ -233,44 +230,16 @@ document.addEventListener('DOMContentLoaded', () => {
                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return (R * c).toFixed(2);
-    };
+        let distance = R * c;
 
-    // CORRECCIÓN: Uso de método POST para evitar errores 404 en OpenRouteService
-    const getdrivingDistanceAndPath = async (coords1, coords2) => {
-        try {
-            const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
-                method: 'POST',
-                headers: {
-                    'Authorization': ORS_API_KEY,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    coordinates: [
-                        [coords1[1], coords1[0]], // [lon, lat]
-                        [coords2[1], coords2[0]]
-                    ]
-                })
-            });
-            
-            if (!response.ok) throw new Error('Error en la API de rutas');
-
-            const data = await response.json();
-
-            if (data.features && data.features.length > 0) {
-                const route = data.features[0];
-                const distance = (route.properties.segments[0].distance / 1000).toFixed(2);
-                const path = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                return { km: distance, ruta: path };
-            }
-            return { km: 'No disponible', ruta: null };
-        } catch (error) {
-            console.error('Error al obtener la ruta en auto:', error);
-            return { km: 'No disponible', ruta: null };
+        // Si es en auto, se aplica un factor estándar de desviación de carreteras (aprox 20% más que la línea recta)
+        if (isCar) {
+            distance = distance * 1.2;
         }
+
+        return distance.toFixed(2);
     };
 
-    // --- UI Y MAPA ---
     const drawTravelsOnMap = async () => {
         map.eachLayer((layer) => {
             if (layer instanceof L.Polyline || layer instanceof L.Marker) {
@@ -356,19 +325,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let ruta = null;
 
         if (origenCoords && destinoCoords) {
-            if (transporte === 'auto') {
-                const result = await getdrivingDistanceAndPath(origenCoords, destinoCoords);
-                if (result.km !== 'No disponible') {
-                    km = result.km;
-                    ruta = result.ruta;
-                } else {
-                    // Respaldo automático de distancia si la API de conducción falla puntualmente
-                    km = calculateDistance(origenCoords, destinoCoords);
-                    ruta = [origenCoords, destinoCoords];
-                }
-            } else {
-                km = calculateDistance(origenCoords, destinoCoords);
-            }
+            // Si es auto, calcula con factor terrestre; si es avión, distancia directa limpia
+            const isCar = (transporte === 'auto');
+            km = calculateDistance(origenCoords, destinoCoords, isCar);
+            ruta = [origenCoords, destinoCoords];
         } else {
             alert(t.alertCoords);
             return;
@@ -377,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const editedId = travelForm.dataset.editing;
         
         if (editedId) {
-            const index = travels.findIndex(t => t.id == editedId);
+            const index = travels.findIndex(item => item.id == editedId);
             if (index !== -1) {
                 travels[index] = { id: parseInt(editedId), fecha, origen, destino, transporte, km, ruta };
             }
